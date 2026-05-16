@@ -1,0 +1,31 @@
+name: Daily Price Tracker
+
+on:
+  schedule:
+    # Runs automatically at 12:00 UTC every day. 
+    # (This is 09:00 AM BRT in São Paulo)
+    - cron: '0 12 * * *' 
+  workflow_dispatch: # This allows you to click a button to run it manually
+
+jobs:
+  run-tracker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Price Check
+        env:
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+        run: python tracker.py --check-now

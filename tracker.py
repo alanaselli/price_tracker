@@ -24,17 +24,25 @@ HEADERS = {
 
 # --- Database Functions ---
 def get_tracked_items():
-    """Loads items from GitHub Secret first, falls back to local JSON."""
-    # 1. Check for the GitHub Secret (comma-separated URLs)
+    """Loads items from GitHub Secret (JSON or comma-separated), falls back to local JSON."""
     secret_items = os.environ.get("TRACKED_ITEMS_SECRET")
+    
     if secret_items:
-        # Split by comma and clean up empty spaces/newlines
-        urls = [url.strip() for url in secret_items.split(",") if url.strip()]
-        if urls:
-            print(f"☁️  Loaded {len(urls)} items from GitHub Secret.")
-            return urls
+        try:
+            # 1. First, try to read the Secret as a JSON array (your current setup)
+            urls = json.loads(secret_items)
+            if isinstance(urls, list) and urls:
+                print(f"☁️  Loaded {len(urls)} items from GitHub Secret (JSON format).")
+                return urls
+        except json.JSONDecodeError:
+            # 2. If it's not valid JSON, fall back to the comma-separated method
+            print("⚠️  Secret is not valid JSON. Attempting comma-separated text...")
+            urls = [url.strip() for url in secret_items.split(",") if url.strip()]
+            if urls:
+                print(f"☁️  Loaded {len(urls)} items from GitHub Secret (Text format).")
+                return urls
 
-    # 2. Fallback to local JSON file
+    # 3. Fallback to local JSON file if no Secret is found
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f:
             urls = json.load(f)
@@ -152,7 +160,7 @@ def main():
         while True:
             schedule.run_pending()
             time.sleep(60)
-            
+
     elif args.check_now:
         run_all_checks()
     else:

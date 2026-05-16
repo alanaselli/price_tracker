@@ -24,23 +24,31 @@ HEADERS = {
 
 # --- Database Functions ---
 def get_tracked_items():
-    """Loads items from GitHub Secret (JSON or comma-separated), falls back to local JSON."""
+    """Loads items from GitHub Secret, aggressively cleaning the text, falls back to local JSON."""
     secret_items = os.environ.get("TRACKED_ITEMS_SECRET")
     
     if secret_items:
         try:
-            # 1. First, try to read the Secret as a JSON array (your current setup)
+            # 1. First, try to read the Secret as a clean JSON array
             urls = json.loads(secret_items)
             if isinstance(urls, list) and urls:
                 print(f"☁️  Loaded {len(urls)} items from GitHub Secret (JSON format).")
-                return urls
+                return [str(u).strip() for u in urls]
         except json.JSONDecodeError:
-            # 2. If it's not valid JSON, fall back to the comma-separated method
-            print("⚠️  Secret is not valid JSON. Attempting comma-separated text...")
-            urls = [url.strip() for url in secret_items.split(",") if url.strip()]
-            if urls:
-                print(f"☁️  Loaded {len(urls)} items from GitHub Secret (Text format).")
-                return urls
+            pass # Move on to the manual cleanup below
+        
+        # 2. If it's not valid JSON, forcefully clean out brackets and quotes
+        print("⚠️  Parsing GitHub Secret as raw text...")
+        
+        # Remove literal brackets, quotes, and newlines
+        cleaned_secret = secret_items.replace("[", "").replace("]", "").replace('"', '').replace("'", "").replace("\n", "")
+        
+        # Split by comma and strip spaces
+        urls = [url.strip() for url in cleaned_secret.split(",") if url.strip()]
+        
+        if urls:
+            print(f"☁️  Loaded {len(urls)} items from GitHub Secret (Text format).")
+            return urls
 
     # 3. Fallback to local JSON file if no Secret is found
     if os.path.exists(DB_FILE):

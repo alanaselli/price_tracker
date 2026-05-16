@@ -23,11 +23,25 @@ HEADERS = {
 }
 
 # --- Database Functions ---
-def load_db():
-    if not os.path.exists(DB_FILE):
-        return []
-    with open(DB_FILE, "r") as f:
-        return json.load(f)
+def get_tracked_items():
+    """Loads items from GitHub Secret first, falls back to local JSON."""
+    # 1. Check for the GitHub Secret (comma-separated URLs)
+    secret_items = os.environ.get("TRACKED_ITEMS_SECRET")
+    if secret_items:
+        # Split by comma and clean up empty spaces/newlines
+        urls = [url.strip() for url in secret_items.split(",") if url.strip()]
+        if urls:
+            print(f"☁️  Loaded {len(urls)} items from GitHub Secret.")
+            return urls
+
+    # 2. Fallback to local JSON file
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r") as f:
+            urls = json.load(f)
+            print(f"💻 Loaded {len(urls)} items from local {DB_FILE}.")
+            return urls
+            
+    return []
 
 def save_db(data):
     with open(DB_FILE, "w") as f:
@@ -82,7 +96,12 @@ def send_email(url, title):
 
 def run_all_checks():
     print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting daily check...")
-    items = load_db()
+    items = get_tracked_items()
+    
+    if not items:
+        print("No items to track. Please add items locally or via GitHub Secrets.")
+        return
+
     for item in items:
         result = check_item(item)
         print(result)
@@ -97,27 +116,32 @@ def main():
     parser.add_argument("--check-now", action="store_true", help="Run checks once and exit (For GitHub Actions)")
     
     args = parser.parse_args()
-    items = load_db()
+
+    # We only load the JSON explicitly here so local management still edits the file properly
+    local_items = []
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r") as f:
+            local_items = json.load(f)
 
     if args.add_item:
-        if args.add_item not in items:
-            items.append(args.add_item)
-            save_db(items)
+        if args.add_item not in local_items:
+            local_items.append(args.add_item)
+            save_db(local_items)
             print(f"Added: {args.add_item}")
         else:
             print("Item is already being tracked.")
 
     elif args.remove_item is not None:
         try:
-            removed = items.pop(args.remove_item)
-            save_db(items)
+            removed = local_items.pop(args.remove_item)
+            save_db(local_items)
             print(f"Removed: {removed}")
         except IndexError:
             print("Invalid index. Use --list-items to see IDs.")
 
     elif args.list_items:
         print("\n--- Currently Tracked Items ---")
-        for i, url in enumerate(items):
+        for i, url in enumerate(local_items):
             print(f"[{i}] {url}")
 
     elif args.serve:
@@ -128,6 +152,7 @@ def main():
         while True:
             schedule.run_pending()
             time.sleep(60)
+            
     elif args.check_now:
         run_all_checks()
     else:

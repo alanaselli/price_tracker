@@ -92,8 +92,9 @@ def main():
     parser = argparse.ArgumentParser(description="E-commerce Price Tracker CLI")
     parser.add_argument("--add-item", type=str, help="Add a product URL to track")
     parser.add_argument("--remove-item", type=int, help="Remove an item by its index number")
-    parser.add_argument("--tracked-items", action="store_true", help="List all tracked items")
+    parser.add_argument("--list-items", action="store_true", help="List all tracked items")
     parser.add_argument("--serve", action="store_true", help="Start the daily scheduler loop")
+    parser.add_argument("--check-now", action="store_true", help="Run checks once and exit (For GitHub Actions)")
     
     args = parser.parse_args()
     items = load_db()
@@ -112,9 +113,9 @@ def main():
             save_db(items)
             print(f"Removed: {removed}")
         except IndexError:
-            print("Invalid index. Use --tracked-items to see IDs.")
+            print("Invalid index. Use --list-items to see IDs.")
 
-    elif args.tracked_items:
+    elif args.list_items:
         print("\n--- Currently Tracked Items ---")
         for i, url in enumerate(items):
             print(f"[{i}] {url}")
@@ -127,6 +128,8 @@ def main():
         while True:
             schedule.run_pending()
             time.sleep(60)
+    elif args.check_now:
+        run_all_checks()
     else:
         parser.print_help()
 
